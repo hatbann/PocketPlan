@@ -27,5 +27,5 @@ jobs:
           push: true
           platforms: linux/arm64
           tags: |
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
-            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/hatbann/pocketplan:${{ github.sha }}
+            ghcr.io/hatbann/pocketplan:latest
