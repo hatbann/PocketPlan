@@ -1,8 +1,12 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// PocketPlan 데이터 모델
+// 결정 근거: docs/DECISIONS.md (D1~D5)
+//  - D1: 다중 사용자 목표. MVP는 고정 userId 1명. 스키마엔 User/userId FK 선반영.
+//  - D3: "월" = 캘린더 월 고정. Month 식별키 = (userId, year, month).
+//  - D4: 할부 = Installment 마스터 + 각 월 Expense(kind=installment) 회차 레코드.
+//  - D5: 금액 = Int(원 단위 정수). 부동소수점 금지.
 
 generator client {
   provider = "prisma-client"
@@ -11,4 +15,123 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // 연결 URL은 Prisma 7부터 schema가 아닌 prisma.config.ts(datasource.url)에서 관리한다.
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+/// 수입 유형: 월급 / 보너스·성과급 / 기타(중고거래·용돈 등)
+enum IncomeType {
+  salary
+  bonus
+  etc
+}
+
+/// 지출 유형: 고정 / 변동 / 할부
+enum ExpenseKind {
+  static
+  variable
+  installment
+}
+
+/// 할부 마스터 상태
+enum InstallmentStatus {
+  active
+  done
+}
+
+// ─────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────
+
+/// 사용자. MVP에선 고정 1명(seed). M4에서 NextAuth 연동(D2).
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  months       Month[]
+  installments Installment[]
+}
+
+/// 한 사용자의 특정 캘린더 월(year+month). 모든 수입/지출의 컨테이너.
+/// salary는 이월 대상 기본 월급(D: 월급 자동 이월). 월급 변경 시 이 값을 수정.
+model Month {
+  id        String   @id @default(cuid())
+  userId    String
+  year      Int // 예: 2026
+  month     Int // 1~12
+  salary    Int      @default(0) // 이번 달 기본 월급(원). 다음 달로 이월되는 값.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  incomes  Income[]
+  expenses Expense[]
+
+  @@unique([userId, year, month]) // 같은 달 중복 생성 방지 + 조회 키
+  @@index([userId])
+}
+
+/// 수입 항목. 월급은 Month.salary로도 표현되지만, 등록 흐름상 salary 타입 Income으로도 기록 가능.
+/// 총 수입 = 해당 Month의 모든 Income.amount 합계 (계산 로직에서 salary 중복 합산 주의 — DECISIONS 참고 예정).
+model Income {
+  id        String     @id @default(cuid())
+  monthId   String
+  type      IncomeType
+  label     String // 표시명(예: "6월 월급", "성과급", "중고거래")
+  amount    Int // 원 단위 정수
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  month Month @relation(fields: [monthId], references: [id], onDelete: Cascade)
+
+  @@index([monthId])
+}
+
+/// 지출 항목. 고정/변동/할부 공통.
+/// 할부(kind=installment)인 경우 installmentId로 마스터를 가리키고 round(이번 회차)를 가진다.
+/// 총 지출 = 고정 + 변동 + 그 달 할부 회차 = 해당 Month의 모든 Expense.amount 합계.
+model Expense {
+  id        String      @id @default(cuid())
+  monthId   String
+  kind      ExpenseKind
+  label     String // 표시명(예: "월세", "식비", "노트북 할부")
+  amount    Int // 원 단위 정수. 할부면 이번 회차 금액.
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // 할부 전용(kind=installment일 때만 채워짐)
+  installmentId String?
+  round         Int? // 이번 달 회차(예: 2 = 2/5)
+
+  month       Month        @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  installment Installment? @relation(fields: [installmentId], references: [id], onDelete: Cascade)
+
+  @@index([monthId])
+  @@index([installmentId])
+}
+
+/// 할부 마스터(원 할부 1건). 매월 회차 Expense를 생성하는 원본.
+/// 회차 자동 +1은 이 마스터를 기준으로 다음 달 Expense를 만든다. 완료되면 status=done.
+model Installment {
+  id            String            @id @default(cuid())
+  userId        String
+  label         String // 예: "노트북 할부"
+  totalMonths   Int // 전체 개월수(예: 5)
+  monthlyAmount Int // 회차당 금액(원)
+  startYear     Int // 1회차가 잡힌 연
+  startMonth    Int // 1회차가 잡힌 월(1~12)
+  status        InstallmentStatus @default(active)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses Expense[] // 이 할부에서 생성된 각 월의 회차 레코드
+
+  @@index([userId])
 }
