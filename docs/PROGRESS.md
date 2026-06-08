@@ -32,8 +32,8 @@
 | 1 | ✅ | Prisma 모델 정의 (User/Month/Income/Expense/Installment) + 스키마 적용 + seed(고정 userId 1명) | dev | 모델·seed·adapter·prisma 싱글톤 작성. `db push`로 `pocketplan` DB에 테이블 생성, seed 입력 완료. 계산 검증(저축 2,085,000원) 통과. (`migrate dev`는 Prisma 로컬 서버 shadow DB 이슈로 P1017 → `db push` 사용) |
 | 2 | ✅ | 핵심 계산 로직 순수 함수 (`총수입/총지출/저축액`) | dev | `app/lib/calc.ts` 작성(DB 비의존, 음수 저축 허용, 종류별 소계, 적자판정). 실데이터 검증 통과 |
 | 2q | ✅ | 계산 로직 검증 | qa | `app/lib/calc.test.ts` 13케이스(`npm test`) 통과. 결함 CALC-1(불변식 불일치) 수정완료, CALC-2(입력검증)는 M1-#3/#4로 이관. `QA-REPORT.md` 기록 |
-| 3 | ⬜ | 입력 저장 Server Action + DB 연동 (수입/지출 CRUD) | dev | entry에서 입력→저장→리스트 반영. (userId 고정) |
-| 4 | 🟡 | 수입/지출 입력 UI 완성 (`app/entry`) | dev | 금액/라벨 입력 폼 + 리스트 표시. 현재 탭/드롭다운 골격만 |
+| 3 | ✅ | 입력 저장 Server Action + DB 연동 (수입/지출 CRUD) | dev | `actions.ts`(addIncome/addExpense/addInstallment/setSalary/deleteIncome/deleteExpense) + `validation.ts`(서버측 검증, CALC-2 반영) + `queries.ts`(userId 격리, getOrCreateMonth/getMonthDetail). 통합테스트(검증·DB쓰기·할부 트랜잭션·IDOR·요약) 통과. UI 연결은 #4 |
+| 4 | ✅ | 수입/지출 입력 UI 완성 (`app/entry`) | dev | page를 Server Component로 전환(getMonthDetail로 DB 조회) + `EntryClient.tsx`(탭·유형 드롭다운·이름/금액 폼·할부 입력·리스트·삭제) Server Action 연결. 빌드/실데이터 렌더(seed 표시)·임시입력 반영 확인 |
 | 5 | 🟡 | 월 요약 대시보드 (`app/overview`+`SummaryCard`) — **저축액 강조 표시** | dev | 실제 총수입/총지출/저축액 렌더. 음수 경고. 현재 박스 골격만 |
 | 6 | ⬜ | overview/entry 월 선택 연동 (캘린더 월) | dev | (userId, year, month)로 데이터 조회 |
 
@@ -60,9 +60,9 @@
 | ⬜ | 보안 점검(비밀/IDOR/입력검증/audit) | security |
 
 ## 다음 할 일 (Top 3)
-1. **입력 저장 Server Action + DB 연동** (수입/지출 CRUD, userId 고정) (M1-#3) (dev) ← **지금 시작 가능**. ⚠️ CALC-2 반영: 금액 ≥0·정수·유한 서버측 검증 필수.
-2. 수입/지출 입력 UI 완성 `app/entry` (M1-#4) (dev)
-3. 월 요약 대시보드 — 저축액 강조 `app/overview`+`SummaryCard` (M1-#5) (dev)
+1. **월 요약 대시보드 — 저축액 강조** `app/overview`+`SummaryCard` (M1-#5) (dev) ← **지금 시작 가능**. summarizeMonth 결과 렌더, 음수 경고. (overview의 미사용 setSelectedDate 경고도 정리)
+2. overview/entry 월 선택 연동 (캘린더 월) (M1-#6) (dev)
+3. → MVP 완성 후 보안 점검(security) / 월 이월(M2)
 
 ## 로컬 개발 메모 (DB 기동)
 - DB는 **Prisma 로컬 서버** 사용. 개발 전 별도 터미널에서 `npx prisma dev` 를 켜둬야 함(끄면 접속 불가).
