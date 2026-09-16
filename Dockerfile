@@ -8,12 +8,15 @@ FROM node:24-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN mkdir -p public && npm run build
+RUN mkdir -p public \
+  && DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build npx prisma generate \
+  && npm run build
 
 FROM node:24-alpine AS runner
 WORKDIR /app
 # node:*-alpine ships a 'node' user at uid 1000 — reuse it instead of
 # creating a duplicate (adduser would fail with uid conflict).
+RUN apk upgrade --no-cache && npm install -g npm@11.19.1
 RUN apk add --no-cache tini
 ENV NODE_ENV=production PORT=3000
 COPY --from=builder --chown=node:node /app/.next ./.next
