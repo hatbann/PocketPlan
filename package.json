@@ -10,12 +10,12 @@
     "test": "tsx --test \"app/**/*.test.ts\""
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.1.0",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
     "lucide-react": "^0.559.0",
-    "next": "16.0.8",
-    "react": "19.2.1",
-    "react-dom": "19.2.1",
+    "next": "16.3.5",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
     "server-only": "^0.0.1"
   },
   "devDependencies": {
@@ -25,7 +25,7 @@
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.22",
     "eslint": "^9",
-    "eslint-config-next": "16.0.8",
+    "eslint-config-next": "16.3.5",
     "postcss": "^8.5.6",
     "prisma": "^7.1.0",
     "tailwindcss": "^4.1.17",
@@ -34,5 +34,9 @@
   },
   "volta": {
     "node": "22.22.3"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.0",
+    "mysql2": "3.24.4"
   }
 }
